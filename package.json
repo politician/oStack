@@ -1,0 +1,42 @@
+{
+  "devDependencies": {
+    "@commitlint/cli": "^12.1.4",
+    "@commitlint/config-conventional": "^12.1.4",
+    "@semantic-release/changelog": "^5.0.1",
+    "@semantic-release/commit-analyzer": "^8.0.1",
+    "@semantic-release/exec": "^5.0.0",
+    "@semantic-release/github": "^7.1.1",
+    "@semantic-release/release-notes-generator": "^9.0.1",
+    "commitizen": "^4.2.1",
+    "cz-customizable": "^6.3.0",
+    "docsify-cli": "^4.4.3",
+    "husky": "^7.0.0",
+    "lint-staged": ">=10",
+    "prettier": "2.3.2",
+    "semantic-release": "^17.4.4"
+  },
+  "config": {
+    "commitizen": {
+      "path": "cz-customizable"
+    }
+  },
+  "lint-staged": {
+    "modules/**": "./.config/tfdocs.sh",
+    "**/*.json": "prettier --config .prettierrc.json --write --ignore-unknown --parser json",
+    "**/*.(yaml|yml)": "prettier --config .prettierrc.json --write --ignore-unknown --parser yaml",
+    "**/*.md": "prettier --config .prettierrc.json --write --ignore-unknown --parser markdown",
+    "**/*.tf": "./.config/tflinter.sh"
+  },
+  "scripts": {
+    "format": "terraform fmt -write -recursive",
+    "lint": "tflint --init --config=.config/.tflint.hcl && tflint --config=.config/.tflint.hcl",
+    "brew": "brew install terraform tfsec tflint checkov terraform-docs jq",
+    "prepare": "husky install .config/husky",
+    "pretty-plan": "terraform -chdir=modules/ostack init && terraform -chdir=modules/ostack plan -out tf.plan && terraform -chdir=modules/ostack show -json tf.plan | jq '.' > modules/ostack/tf.plan.pretty.json && rm -rf modules/ostack/tf.plan",
+    "security": "tfsec && yarn security:plan -d modules/ostack",
+    "security:plan": "yarn pretty-plan && checkov --config-file .config/.checkov.yaml --repo-root-for-plan-enrichment $PWD/modules/ostack -f modules/ostack/tf.plan.pretty.json",
+    "test": "yarn test:static && yarn test:integration",
+    "test:integration": "terraform -chdir=modules/ostack test",
+    "test:static": "yarn format && yarn lint modules/ostack && yarn pretty-plan && yarn security"
+  }
+}

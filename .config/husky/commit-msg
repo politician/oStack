@@ -1,0 +1,5 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+#echo $HUSKY_GIT_PARAMS && echo $HUSKY_GIT_STDIN && yarn run commitlint -E HUSKY_GIT_PARAMS --config .config/commitlint.config.js
+yarn run commitlint --config .config/commitlint.config.js --edit $1

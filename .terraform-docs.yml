@@ -1,0 +1,9 @@
+formatter: markdown
+
+output:
+  file: docs/README.md
+  mode: inject
+
+sort:
+  enabled: true
+  by: required

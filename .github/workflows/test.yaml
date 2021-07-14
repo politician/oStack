@@ -1,0 +1,175 @@
+name: Run tests
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**/docs/**"
+      - "**.md"
+      - "infra/**"
+
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - "**/docs/**"
+      - "**.md"
+      - "templates/**"
+      - "infra/**"
+
+jobs:
+  matrix:
+    name: Generate modules matrix
+    runs-on: ubuntu-latest
+    outputs:
+      modules: ${{ steps.modules.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v2
+      - id: modules
+        run: echo "::set-output name=matrix::[$(modules=($(ls modules)); printf '"%s",' "${modules[@]}")]"
+
+  unit:
+    name: Unit test ${{ matrix.path }}
+    needs: matrix
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        path: ${{fromJSON(needs.matrix.outputs.modules)}}
+      fail-fast: true
+    env:
+      path: modules/${{ matrix.path }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 2
+
+      - name: Check if ${{ env.path }} should be tested
+        id: changed
+        uses: marceloprado/has-changed-path@v1
+        with:
+          paths: ${{ env.path }}
+
+      - if: steps.changed.outputs.changed == 'true'
+        name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+
+      - if: steps.changed.outputs.changed == 'true'
+        name: Check Terraform format
+        run: terraform fmt -check -recursive
+        working-directory: ${{ env.path }}
+
+      - if: steps.changed.outputs.changed == 'true'
+        name: Initialize Terraform
+        run: terraform init
+        working-directory: ${{ env.path }}
+
+      - if: steps.changed.outputs.changed == 'true'
+        name: Validate Terraform config
+        run: terraform validate
+        working-directory: ${{ env.path }}
+
+      - if: steps.changed.outputs.changed == 'true'
+        name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v1
+        with:
+          github_token: ${{ github.token }}
+
+      - if: steps.changed.outputs.changed == 'true'
+        name: Init TFLint
+        run: tflint --init --config=../../.config/.tflint.hcl
+        working-directory: ${{ env.path }}
+
+      - if: steps.changed.outputs.changed == 'true'
+        name: Run TFLint
+        run: tflint --format=compact --config=../../.config/.tflint.hcl
+        working-directory: ${{ env.path }}
+
+      - if: steps.changed.outputs.changed == 'true'
+        id: tfsec
+        name: Terraform security scan
+        run: docker run -v "$(pwd):/src" tfsec/tfsec /src/${{ env.path }}
+
+      - if: steps.changed.outputs.changed == 'true'
+        name: Run checkov
+        run: docker run -v "$(pwd):/src" bridgecrew/checkov -d /src/${{ env.path }} --config-file /src/.config/.checkov.yaml --compact
+
+  e2e:
+    name: End-to-end test oStack
+    if: github.event_name == 'push' || (github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')
+    needs: [matrix, unit]
+    runs-on: ubuntu-latest
+    env:
+      path: modules/ostack
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v2
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+
+      - name: Check Terraform format
+        run: terraform fmt -check -recursive -diff
+        working-directory: ${{ env.path }}
+
+      - name: Initialize Terraform
+        run: terraform init
+        working-directory: ${{ env.path }}
+
+      - name: Validate Terraform config
+        run: terraform validate
+        working-directory: ${{ env.path }}
+
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v1
+        with:
+          github_token: ${{ github.token }}
+
+      - name: Init TFLint
+        run: tflint --init --config=../../.config/.tflint.hcl
+        working-directory: ${{ env.path }}
+
+      - name: Run TFLint
+        run: tflint --format=compact --config=../../.config/.tflint.hcl --module
+        working-directory: ${{ env.path }}
+
+      - name: Terraform security scan
+        run: docker run -v "$(pwd):/src" tfsec/tfsec /src/${{ env.path }}
+
+      - name: Run Terraform plan
+        run: terraform plan -input=false -out tf.plan
+        working-directory: ${{ env.path }}
+        env:
+          TF_VAR_organization_title: Romain Test
+          TF_VAR_tfe_oauth_token_id: ${{ secrets.TFE_OAUTH_TOKEN_ID }}
+          TF_VAR_vcs_token_write: ${{ secrets.COPYBARA_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.COPYBARA_TOKEN }}
+          LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
+          TFE_TOKEN: ${{ secrets.TFE_TOKEN }}
+
+      - name: Convert Terraform plan to JSON
+        run: terraform show -json tf.plan > tf.plan.json
+        working-directory: ${{ env.path }}
+
+      - name: Prettify JSON plan to get meaningful errors in checkov
+        # A weird GH actions bug injects actions metadata in the output so we filter only the lines containing JSON
+        run: grep '^{"' tf.plan.json | jq '.' > tf.plan.pretty.json
+        working-directory: ${{ env.path }}
+
+      - name: Remove extraneous plan files
+        run: rm -rf tf.plan tf.plan.json
+        working-directory: ${{ env.path }}
+
+      - name: Run checkov
+        run: docker run -v "$(pwd):/src" bridgecrew/checkov -d /src --config-file /src/.config/.checkov.yaml --repo-root-for-plan-enrichment /src/modules/ostack
+
+      - name: Run tests
+        run: terraform test
+        working-directory: ${{ env.path }}
+        env:
+          TF_VAR_organization_title: Romain Test
+          TF_VAR_tfe_oauth_token_id: ${{ secrets.TFE_OAUTH_TOKEN_ID }}
+          TF_VAR_vcs_token_write: ${{ secrets.COPYBARA_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.COPYBARA_TOKEN }}
+          LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
+          TFE_TOKEN: ${{ secrets.TFE_TOKEN }}
