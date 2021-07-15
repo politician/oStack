@@ -33,6 +33,7 @@ jobs:
     name: Sync ${{ matrix.repo }}
     needs: matrix
     runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_run'
     strategy:
       fail-fast: false
       matrix: ${{fromJSON(needs.matrix.outputs.modules)}}
