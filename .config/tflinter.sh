@@ -3,6 +3,9 @@
 declare root=$PWD
 declare -a folders
 
+# Folders where terraform-docs is allowed to operate
+declare valid_folders=(modules/**)
+
 ##
 # Terraform format file by file
 ##
@@ -17,15 +20,21 @@ done
 declare unique_folders=($(echo ${folders[@]} | tr ' ' '\n' | sort -u | tr '\n' ' '))
 declare -a tflint_results
 
+# For each...
 for folder in ${unique_folders[@]}; do
 
-  cd $folder
+  # ...folder where terraform-docs is allowed to operate
+  if [[ "${valid_folders[@]}" =~ "${folder}" ]]; then
 
-  while IFS= read -r line; do
-    tflint_results+=( "${folder#"$root"}/$line" )
-  done < <(tflint -f compact -c $root/.config/.tflint.hcl | grep .tf)
+    cd $folder
 
-  cd $root
+    while IFS= read -r line; do
+      tflint_results+=( "${folder#"$root"}/$line" )
+    done < <(tflint -f compact -c $root/.config/.tflint.hcl | grep .tf)
+
+    cd $root
+
+  fi
 
 done
 
