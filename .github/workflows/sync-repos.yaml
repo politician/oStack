@@ -1,4 +1,4 @@
-name: Sync Terraform modules to external repos
+name: Sync Terraform modules and repo templates to external repos
 concurrency:
   group: sync_repos
   cancel-in-progress: true
@@ -11,7 +11,7 @@ on:
 
   push:
     branches: [main]
-    paths: ["templates/**", "infra/**"]
+    paths: ["templates/**", "infra/**", ".github/workflows/sync-repos.yaml"]
 
 jobs:
   matrix:
@@ -41,13 +41,12 @@ jobs:
       - uses: actions/checkout@v2
         with:
           fetch-depth: 0
-      - uses: Olivr/copybara-action@v1.2.2
+      - uses: Olivr/copybara-action@main
         with:
           ssh_key: ${{ secrets.copybara_ssh_key }}
           access_token: ${{ secrets.copybara_token }}
           sot_repo: ${{ github.repository_owner }}/oStack
           destination_repo: ${{ github.repository_owner }}/${{ matrix.repo }}
-          destination_branch: main
           workflow: push
           push_include: "LICENSE .gitignore .prettierignore .prettierrc.json package.json yarn.lock .config/** modules/.github/** ${{ matrix.path }}/**"
           push_replace: ${{ matrix.replace }}
@@ -67,13 +66,11 @@ jobs:
       - uses: actions/checkout@v2
         with:
           fetch-depth: 0
-      - uses: Olivr/copybara-action@v1.2.2
+      - uses: Olivr/copybara-action@main
         with:
           ssh_key: ${{ secrets.copybara_ssh_key }}
           access_token: ${{ secrets.copybara_token }}
           sot_repo: ${{ github.repository_owner }}/oStack
           destination_repo: ${{ github.repository_owner }}/${{ matrix.repo }}
-          destination_branch: main
-          workflow: push
           push_include: "${{ matrix.path }}/**"
           push_move: ${{ matrix.path }}||
