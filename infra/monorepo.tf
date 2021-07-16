@@ -52,15 +52,14 @@ locals {
 
 // Maintain the monorepo
 module "ostack_monorepo" {
-  source = "../modules/vcs-repo-github"
+  source = "../modules/repo-github"
 
-  repo_name = "oStack"
-  repo_configuration = {
-    repo_enable_projects = false
-    repo_enable_wikis    = false
-    repo_protect         = true
-    website              = "https://oStack.io"
-  }
+  name               = "oStack"
+  homepage_url       = "https://oStack.io"
+  auto_init          = false
+  has_projects       = false
+  has_wiki           = false
+  archive_on_destroy = true
 
   secrets = {
     copybara_ssh_key = null

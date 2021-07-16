@@ -8,19 +8,17 @@ locals {
 
 // Create repos for Terraform modules
 module "terraform_templates" {
-  source   = "../modules/vcs-repo-github"
+  source   = "../modules/repo-github"
   for_each = local.terraform_templates
 
-  repo_name = each.value
-  repo_configuration = {
-    description          = "Mirror of https://github.com/Olivr/oStack/tree/main/templates/${each.key}"
-    website              = "https://oStack.io"
-    repo_auto_init       = false
-    repo_enable_issues   = false
-    repo_enable_projects = false
-    repo_enable_wikis    = false
-    repo_is_template     = true
-  }
+  name         = each.value
+  description  = "Mirror of https://github.com/Olivr/oStack/tree/main/templates/${each.key}"
+  homepage_url = "https://oStack.io"
+  auto_init    = false
+  has_issues   = false
+  has_projects = false
+  has_wiki     = false
+  is_template  = true
 
   secrets = {
     copybara_ssh_key = null
