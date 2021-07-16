@@ -43,53 +43,54 @@ jobs:
         with:
           fetch-depth: 2
 
-      - name: Check if ${{ env.path }} should be tested
+      - if: github.event_name == 'pull_request'
+        name: Check if ${{ env.path }} should be tested
         id: changed
         uses: marceloprado/has-changed-path@v1
         with:
           paths: ${{ env.path }}
 
-      - if: steps.changed.outputs.changed == 'true'
+      - if: github.event_name == 'push' || steps.changed.outputs.changed == 'true'
         name: Setup Terraform
         uses: hashicorp/setup-terraform@v1
 
-      - if: steps.changed.outputs.changed == 'true'
+      - if: github.event_name == 'push' || steps.changed.outputs.changed == 'true'
         name: Check Terraform format
         run: terraform fmt -check -recursive
         working-directory: ${{ env.path }}
 
-      - if: steps.changed.outputs.changed == 'true'
+      - if: github.event_name == 'push' || steps.changed.outputs.changed == 'true'
         name: Initialize Terraform
         run: terraform init
         working-directory: ${{ env.path }}
 
-      - if: steps.changed.outputs.changed == 'true'
+      - if: github.event_name == 'push' || steps.changed.outputs.changed == 'true'
         name: Validate Terraform config
         run: terraform validate
         working-directory: ${{ env.path }}
 
-      - if: steps.changed.outputs.changed == 'true'
+      - if: github.event_name == 'push' || steps.changed.outputs.changed == 'true'
         name: Setup TFLint
         uses: terraform-linters/setup-tflint@v1
         with:
           github_token: ${{ github.token }}
 
-      - if: steps.changed.outputs.changed == 'true'
+      - if: github.event_name == 'push' || steps.changed.outputs.changed == 'true'
         name: Init TFLint
         run: tflint --init --config=../../.config/.tflint.hcl
         working-directory: ${{ env.path }}
 
-      - if: steps.changed.outputs.changed == 'true'
+      - if: github.event_name == 'push' || steps.changed.outputs.changed == 'true'
         name: Run TFLint
         run: tflint --format=compact --config=../../.config/.tflint.hcl
         working-directory: ${{ env.path }}
 
-      - if: steps.changed.outputs.changed == 'true'
+      - if: github.event_name == 'push' || steps.changed.outputs.changed == 'true'
         id: tfsec
         name: Terraform security scan
         run: docker run -v "$(pwd):/src" tfsec/tfsec /src/${{ env.path }}
 
-      - if: steps.changed.outputs.changed == 'true'
+      - if: github.event_name == 'push' || steps.changed.outputs.changed == 'true'
         name: Run checkov
         run: docker run -v "$(pwd):/src" bridgecrew/checkov -d /src/${{ env.path }} --config-file /src/.config/.checkov.yaml --compact
 
@@ -140,7 +141,8 @@ jobs:
         run: terraform plan -input=false -out tf.plan
         working-directory: ${{ env.path }}
         env:
-          TF_VAR_organization_title: Romain Test
+          TF_VAR_organization_title: Test
+          TF_VAR_organization_name: ${{ github.repository_owner }}
           TF_VAR_tfe_oauth_token_id: ${{ secrets.TFE_OAUTH_TOKEN_ID }}
           TF_VAR_vcs_token_write: ${{ secrets.COPYBARA_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.COPYBARA_TOKEN }}
@@ -167,7 +169,8 @@ jobs:
         run: terraform test
         working-directory: ${{ env.path }}
         env:
-          TF_VAR_organization_title: Romain Test
+          TF_VAR_organization_title: Test
+          TF_VAR_organization_name: ${{ github.repository_owner }}
           TF_VAR_tfe_oauth_token_id: ${{ secrets.TFE_OAUTH_TOKEN_ID }}
           TF_VAR_vcs_token_write: ${{ secrets.COPYBARA_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.COPYBARA_TOKEN }}
